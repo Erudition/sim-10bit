@@ -7,21 +7,21 @@ services:
       context: .
       dockerfile: docker/app.Dockerfile
     ports:
-      - '3000:3000'
+      - '3701:3701'
     deploy:
       resources:
         limits:
           memory: 8G
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-simstudio}
-      - BETTER_AUTH_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:3703/${POSTGRES_DB:-simstudio}
+      - BETTER_AUTH_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3701}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3701}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-sim_auth_secret_$(openssl rand -hex 16)}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-$(openssl rand -hex 32)}
       - COPILOT_API_KEY=${COPILOT_API_KEY}
       - SIM_AGENT_API_URL=${SIM_AGENT_API_URL}
-      - OLLAMA_URL=http://ollama:11434
-      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-http://localhost:3002}
+      - OLLAMA_URL=http://ollama:3704
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-http://localhost:3702}
     depends_on:
       db:
         condition: service_healthy
@@ -30,7 +30,7 @@ services:
       realtime:
         condition: service_healthy
     healthcheck:
-      test: ['CMD', 'wget', '--spider', '--quiet', 'http://127.0.0.1:3000']
+      test: ['CMD', 'wget', '--spider', '--quiet', 'http://127.0.0.1:3701']
       interval: 90s
       timeout: 5s
       retries: 3
@@ -43,22 +43,22 @@ services:
       context: .
       dockerfile: docker/realtime.Dockerfile
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-simstudio}
-      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:3703/${POSTGRES_DB:-simstudio}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3701}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3701}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-sim_auth_secret_$(openssl rand -hex 16)}
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
     ports:
-      - '3002:3002'
+      - '3702:3702'
     deploy:
       resources:
         limits:
           memory: 8G
     healthcheck:
-      test: ['CMD', 'wget', '--spider', '--quiet', 'http://127.0.0.1:3002/health']
+      test: ['CMD', 'wget', '--spider', '--quiet', 'http://127.0.0.1:3702/health']
       interval: 90s
       timeout: 5s
       retries: 3
@@ -70,7 +70,7 @@ services:
       context: .
       dockerfile: docker/db.Dockerfile
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-simstudio}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:3703/${POSTGRES_DB:-simstudio}
     depends_on:
       db:
         condition: service_healthy
@@ -82,7 +82,7 @@ services:
     image: pgvector/pgvector:pg17
     restart: always
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '${POSTGRES_PORT:-3703}:3703'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
@@ -95,53 +95,19 @@ services:
       timeout: 5s
       retries: 5
 
-  # Ollama with GPU support (default)
-  ollama:
-    profiles:
-      - gpu
-    image: ollama/ollama:latest
-    pull_policy: always
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - '11434:11434'
-    environment:
-      - NVIDIA_DRIVER_CAPABILITIES=all
-      - OLLAMA_LOAD_TIMEOUT=-1
-      - OLLAMA_KEEP_ALIVE=-1
-      - OLLAMA_DEBUG=1
-      - OLLAMA_HOST=0.0.0.0:11434
-    command: 'serve'
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    healthcheck:
-      test: ['CMD', 'ollama', 'list']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-
-  # Ollama CPU-only version (use with --profile cpu profile)
+  # Ollama CPU-only version
   ollama-cpu:
-    profiles:
-      - cpu
     image: ollama/ollama:latest
     pull_policy: always
     volumes:
       - ollama_data:/root/.ollama
     ports:
-      - '11434:11434'
+      - '3704:3704'
     environment:
       - OLLAMA_LOAD_TIMEOUT=-1
       - OLLAMA_KEEP_ALIVE=-1
       - OLLAMA_DEBUG=1
-      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_HOST=0.0.0.0:3704
     command: 'serve'
     healthcheck:
       test: ['CMD', 'ollama', 'list']
@@ -152,8 +118,6 @@ services:
     restart: unless-stopped
     networks:
       default:
-        aliases:
-          - ollama
 
   # Helper container to pull models automatically
   model-setup:
@@ -163,7 +127,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     environment:
-      - OLLAMA_HOST=ollama:11434
+      - OLLAMA_HOST=ollama:3704
     entrypoint: ["/bin/sh", "-lc"]
     command: >
       sh -c "
